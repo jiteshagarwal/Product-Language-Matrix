@@ -219,39 +219,52 @@ for i, lang in enumerate(languages):
     f_ssa_llm = get_lookup_formula("SSA-LLM", r)
     f_kaas = get_lookup_formula("KaaS", r)
 
-    # Helper: check if status contains "Not Supported" or "Limited Support"
+    # Helper: check if status contains "Not Supported", "Limited Support", or "Cross-Region"
     def is_not_supported(f):
         return f'ISNUMBER(SEARCH("Not Supported", {f}))'
 
     def is_limited(f):
         return f'ISNUMBER(SEARCH("Limited Support", {f}))'
 
+    def is_cross_region(f):
+        return f'ISNUMBER(SEARCH("Cross-Region", {f}))'
+
     # 1. SSA (ASR, SSA-LLM, KaaS)
-    # Logic: If ANY are "Not Supported" -> Not Supported. Else if ANY are "Limited" -> Limited. Else Full.
+    # Logic: If ANY are "Not Supported" -> Not Supported
+    # Else if ANY are "Limited" -> Limited Support (Cross-Region if any Cross-Region, else In-Region)
+    # Else Full Support (Cross-Region if any Cross-Region, else In-Region)
     formula_ssa = (
         f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_ssa_llm)}, {is_not_supported(f_kaas)}), "Not Supported", '
-        f'IF(OR({is_limited(f_asr)}, {is_limited(f_ssa_llm)}, {is_limited(f_kaas)}), "Limited Support", "Full Support"))'
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_ssa_llm)}, {is_limited(f_kaas)}), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_ssa_llm)}, {is_cross_region(f_kaas)}), "Limited Support (Cross-Region)", "Limited Support (In-Region)"), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_ssa_llm)}, {is_cross_region(f_kaas)}), "Full Support (Cross-Region)", "Full Support (In-Region)")))'
     )
     ws_prod.cell(row=r, column=2, value=formula_ssa).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     # 2. RTGA (ASR, Intent, Entity, Gen AI Summary, Gen AI Disposition, Redaction, KaaS, Pro-active Service)
     formula_rtga = (
         f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_intent)}, {is_not_supported(f_entity)}, {is_not_supported(f_gen_summary)}, {is_not_supported(f_gen_disp)}, {is_not_supported(f_redaction)}, {is_not_supported(f_kaas)}, {is_not_supported(f_proactive)}), "Not Supported", '
-        f'IF(OR({is_limited(f_asr)}, {is_limited(f_intent)}, {is_limited(f_entity)}, {is_limited(f_gen_summary)}, {is_limited(f_gen_disp)}, {is_limited(f_redaction)}, {is_limited(f_kaas)}, {is_limited(f_proactive)}), "Limited Support", "Full Support"))'
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_intent)}, {is_limited(f_entity)}, {is_limited(f_gen_summary)}, {is_limited(f_gen_disp)}, {is_limited(f_redaction)}, {is_limited(f_kaas)}, {is_limited(f_proactive)}), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_intent)}, {is_cross_region(f_entity)}, {is_cross_region(f_gen_summary)}, {is_cross_region(f_gen_disp)}, {is_cross_region(f_redaction)}, {is_cross_region(f_kaas)}, {is_cross_region(f_proactive)}), "Limited Support (Cross-Region)", "Limited Support (In-Region)"), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_intent)}, {is_cross_region(f_entity)}, {is_cross_region(f_gen_summary)}, {is_cross_region(f_gen_disp)}, {is_cross_region(f_redaction)}, {is_cross_region(f_kaas)}, {is_cross_region(f_proactive)}), "Full Support (Cross-Region)", "Full Support (In-Region)")))'
     )
     ws_prod.cell(row=r, column=3, value=formula_rtga).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     # 3. CIA (ASR, Gen AI Disposition, Redaction, Conversation Facts)
     formula_cia = (
         f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_gen_disp)}, {is_not_supported(f_redaction)}, {is_not_supported(f_conv_facts)}), "Not Supported", '
-        f'IF(OR({is_limited(f_asr)}, {is_limited(f_gen_disp)}, {is_limited(f_redaction)}, {is_limited(f_conv_facts)}), "Limited Support", "Full Support"))'
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_gen_disp)}, {is_limited(f_redaction)}, {is_limited(f_conv_facts)}), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_gen_disp)}, {is_cross_region(f_redaction)}, {is_cross_region(f_conv_facts)}), "Limited Support (Cross-Region)", "Limited Support (In-Region)"), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_gen_disp)}, {is_cross_region(f_redaction)}, {is_cross_region(f_conv_facts)}), "Full Support (Cross-Region)", "Full Support (In-Region)")))'
     )
     ws_prod.cell(row=r, column=4, value=formula_cia).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     # 4. CRA (ASR, Redaction)
     formula_cra = (
         f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_redaction)}), "Not Supported", '
-        f'IF(OR({is_limited(f_asr)}, {is_limited(f_redaction)}), "Limited Support", "Full Support"))'
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_redaction)}), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_redaction)}), "Limited Support (Cross-Region)", "Limited Support (In-Region)"), '
+        f'IF(OR({is_cross_region(f_asr)}, {is_cross_region(f_redaction)}), "Full Support (Cross-Region)", "Full Support (In-Region)")))'
     )
     ws_prod.cell(row=r, column=5, value=formula_cra).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
