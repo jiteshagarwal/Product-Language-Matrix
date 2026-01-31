@@ -20,15 +20,16 @@ services = [
     "Entity (NER/Spacy)",
     "Gen AI Summary",
     "Pro-active Service",
-    "LLM"
+    "LLM",
+    "KaaS"
 ]
 products = ["SSA", "RTGA", "CIA", "CRA"]
 statuses = ["Full Support", "Limited Support", "Not Supported"]
 
 # Dependency Logic (For Reference/Comments)
-# SSA: ASR, Gen AI Summary, LLM, Conversation Facts
-# RTGA: ASR, Intent (UniFit), Entity (NER/Spacy), Gen AI Disposition, LLM, Pro-active Service
-# CIA: Intent (UniFit), Entity (NER/Spacy), Gen AI Summary, Conversation Facts, LLM
+# SSA: ASR, LLM, KaaS
+# RTGA: ASR, Intent, Entity, Gen AI Summary, Gen AI Disposition, Redaction, KaaS, Pro-active Service
+# CIA: ASR, Gen AI Disposition, Redaction, Conversation Facts
 # CRA: ASR, Redaction
 
 wb = Workbook()
@@ -196,26 +197,27 @@ for i, lang in enumerate(languages):
     f_gen_summary = get_lookup_formula("Gen AI Summary", r)
     f_proactive = get_lookup_formula("Pro-active Service", r)
     f_llm = get_lookup_formula("LLM", r)
+    f_kaas = get_lookup_formula("KaaS", r)
 
-    # 1. SSA (ASR, Gen AI Summary, LLM, Conversation Facts)
+    # 1. SSA (ASR, LLM, KaaS)
     # Logic: If ANY are "Not Supported" -> Not Supported. Else if ANY are "Limited" -> Limited. Else Full.
     formula_ssa = (
-        f'=IF(OR({f_asr}="Not Supported", {f_gen_summary}="Not Supported", {f_llm}="Not Supported", {f_conv_facts}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_gen_summary}="Limited Support", {f_llm}="Limited Support", {f_conv_facts}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({f_asr}="Not Supported", {f_llm}="Not Supported", {f_kaas}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_asr}="Limited Support", {f_llm}="Limited Support", {f_kaas}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=2, value=formula_ssa).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # 2. RTGA (ASR, Intent, Entity, Gen AI Disposition, LLM, Pro-active Service)
+    # 2. RTGA (ASR, Intent, Entity, Gen AI Summary, Gen AI Disposition, Redaction, KaaS, Pro-active Service)
     formula_rtga = (
-        f'=IF(OR({f_asr}="Not Supported", {f_intent}="Not Supported", {f_entity}="Not Supported", {f_gen_disp}="Not Supported", {f_llm}="Not Supported", {f_proactive}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_intent}="Limited Support", {f_entity}="Limited Support", {f_gen_disp}="Limited Support", {f_llm}="Limited Support", {f_proactive}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({f_asr}="Not Supported", {f_intent}="Not Supported", {f_entity}="Not Supported", {f_gen_summary}="Not Supported", {f_gen_disp}="Not Supported", {f_redaction}="Not Supported", {f_kaas}="Not Supported", {f_proactive}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_asr}="Limited Support", {f_intent}="Limited Support", {f_entity}="Limited Support", {f_gen_summary}="Limited Support", {f_gen_disp}="Limited Support", {f_redaction}="Limited Support", {f_kaas}="Limited Support", {f_proactive}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=3, value=formula_rtga).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # 3. CIA (Intent, Entity, Gen AI Summary, Conversation Facts, LLM)
+    # 3. CIA (ASR, Gen AI Disposition, Redaction, Conversation Facts)
     formula_cia = (
-        f'=IF(OR({f_intent}="Not Supported", {f_entity}="Not Supported", {f_gen_summary}="Not Supported", {f_conv_facts}="Not Supported", {f_llm}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_intent}="Limited Support", {f_entity}="Limited Support", {f_gen_summary}="Limited Support", {f_conv_facts}="Limited Support", {f_llm}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({f_asr}="Not Supported", {f_gen_disp}="Not Supported", {f_redaction}="Not Supported", {f_conv_facts}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_asr}="Limited Support", {f_gen_disp}="Limited Support", {f_redaction}="Limited Support", {f_conv_facts}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=4, value=formula_cia).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
