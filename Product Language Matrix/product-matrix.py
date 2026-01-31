@@ -20,14 +20,20 @@ services = [
     "Entity (NER/Spacy)",
     "Gen AI Summary",
     "Pro-active Service",
-    "LLM",
+    "SSA-LLM",
     "KaaS"
 ]
 products = ["SSA", "RTGA", "CIA", "CRA"]
-statuses = ["Full Support", "Limited Support", "Not Supported"]
+statuses = [
+    "Full Support (In-Region)",
+    "Full Support (Cross-Region)",
+    "Limited Support (In-Region)",
+    "Limited Support (Cross-Region)",
+    "Not Supported"
+]
 
 # Dependency Logic (For Reference/Comments)
-# SSA: ASR, LLM, KaaS
+# SSA: ASR, SSA-LLM, KaaS
 # RTGA: ASR, Intent, Entity, Gen AI Summary, Gen AI Disposition, Redaction, KaaS, Pro-active Service
 # CIA: ASR, Gen AI Disposition, Redaction, Conversation Facts
 # CRA: ASR, Redaction
@@ -54,8 +60,8 @@ row_num = 2
 for r in regions:
     for s in services:
         for l in languages:
-            # Random Status
-            status = random.choices(statuses, weights=[40, 30, 30], k=1)[0]
+            # Random Status (5 options: Full In-Region, Full Cross-Region, Limited In-Region, Limited Cross-Region, Not Supported)
+            status = random.choices(statuses, weights=[25, 20, 15, 15, 25], k=1)[0]
             # Key: Region|Service|Language
             key_formula = f'=A{row_num}&"|"&B{row_num}&"|"&C{row_num}'
             ws_data.append([r, s, l, status, key_formula])
@@ -69,23 +75,37 @@ ws_data.column_dimensions['E'].hidden = True
 def apply_dark_theme_formatting(ws, start_row, start_col, num_cols, num_rows):
     # Background
     ws.sheet_view.showGridLines = False
-    
+
     # Conditional Formatting Ranges
     matrix_range = f"{get_column_letter(start_col)}{start_row+1}:{get_column_letter(start_col+num_cols-1)}{start_row+num_rows}"
 
-    # Green (Full Support)
-    green_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
-    dxf_green = DifferentialStyle(fill=green_fill, font=Font(color="FFFFFF"))
-    rule_green = Rule(type="containsText", operator="containsText", text="Full Support", dxf=dxf_green)
-    rule_green.formula = [f'NOT(ISERROR(SEARCH("Full Support", {matrix_range})))']
-    ws.conditional_formatting.add(matrix_range, rule_green)
+    # Dark Green (Full Support - In-Region)
+    dark_green_fill = PatternFill(start_color="375623", end_color="375623", fill_type="solid")
+    dxf_dark_green = DifferentialStyle(fill=dark_green_fill, font=Font(color="FFFFFF"))
+    rule_dark_green = Rule(type="containsText", operator="containsText", text="Full Support (In-Region)", dxf=dxf_dark_green)
+    rule_dark_green.formula = [f'NOT(ISERROR(SEARCH("Full Support (In-Region)", {matrix_range})))']
+    ws.conditional_formatting.add(matrix_range, rule_dark_green)
 
-    # Yellow (Limited)
-    yellow_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
-    dxf_yellow = DifferentialStyle(fill=yellow_fill) 
-    rule_yellow = Rule(type="containsText", operator="containsText", text="Limited Support", dxf=dxf_yellow)
-    rule_yellow.formula = [f'NOT(ISERROR(SEARCH("Limited Support", {matrix_range})))']
-    ws.conditional_formatting.add(matrix_range, rule_yellow)
+    # Light Green (Full Support - Cross-Region)
+    light_green_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+    dxf_light_green = DifferentialStyle(fill=light_green_fill, font=Font(color="FFFFFF"))
+    rule_light_green = Rule(type="containsText", operator="containsText", text="Full Support (Cross-Region)", dxf=dxf_light_green)
+    rule_light_green.formula = [f'NOT(ISERROR(SEARCH("Full Support (Cross-Region)", {matrix_range})))']
+    ws.conditional_formatting.add(matrix_range, rule_light_green)
+
+    # Dark Yellow/Orange (Limited Support - In-Region)
+    dark_yellow_fill = PatternFill(start_color="BF8F00", end_color="BF8F00", fill_type="solid")
+    dxf_dark_yellow = DifferentialStyle(fill=dark_yellow_fill, font=Font(color="FFFFFF"))
+    rule_dark_yellow = Rule(type="containsText", operator="containsText", text="Limited Support (In-Region)", dxf=dxf_dark_yellow)
+    rule_dark_yellow.formula = [f'NOT(ISERROR(SEARCH("Limited Support (In-Region)", {matrix_range})))']
+    ws.conditional_formatting.add(matrix_range, rule_dark_yellow)
+
+    # Light Yellow (Limited Support - Cross-Region)
+    light_yellow_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+    dxf_light_yellow = DifferentialStyle(fill=light_yellow_fill)
+    rule_light_yellow = Rule(type="containsText", operator="containsText", text="Limited Support (Cross-Region)", dxf=dxf_light_yellow)
+    rule_light_yellow.formula = [f'NOT(ISERROR(SEARCH("Limited Support (Cross-Region)", {matrix_range})))']
+    ws.conditional_formatting.add(matrix_range, rule_light_yellow)
 
     # Red (Not Supported)
     red_fill = PatternFill(start_color="ED7D31", end_color="ED7D31", fill_type="solid")
@@ -196,35 +216,42 @@ for i, lang in enumerate(languages):
     f_entity = get_lookup_formula("Entity (NER/Spacy)", r)
     f_gen_summary = get_lookup_formula("Gen AI Summary", r)
     f_proactive = get_lookup_formula("Pro-active Service", r)
-    f_llm = get_lookup_formula("LLM", r)
+    f_ssa_llm = get_lookup_formula("SSA-LLM", r)
     f_kaas = get_lookup_formula("KaaS", r)
 
-    # 1. SSA (ASR, LLM, KaaS)
+    # Helper: check if status contains "Not Supported" or "Limited Support"
+    def is_not_supported(f):
+        return f'ISNUMBER(SEARCH("Not Supported", {f}))'
+
+    def is_limited(f):
+        return f'ISNUMBER(SEARCH("Limited Support", {f}))'
+
+    # 1. SSA (ASR, SSA-LLM, KaaS)
     # Logic: If ANY are "Not Supported" -> Not Supported. Else if ANY are "Limited" -> Limited. Else Full.
     formula_ssa = (
-        f'=IF(OR({f_asr}="Not Supported", {f_llm}="Not Supported", {f_kaas}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_llm}="Limited Support", {f_kaas}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_ssa_llm)}, {is_not_supported(f_kaas)}), "Not Supported", '
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_ssa_llm)}, {is_limited(f_kaas)}), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=2, value=formula_ssa).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     # 2. RTGA (ASR, Intent, Entity, Gen AI Summary, Gen AI Disposition, Redaction, KaaS, Pro-active Service)
     formula_rtga = (
-        f'=IF(OR({f_asr}="Not Supported", {f_intent}="Not Supported", {f_entity}="Not Supported", {f_gen_summary}="Not Supported", {f_gen_disp}="Not Supported", {f_redaction}="Not Supported", {f_kaas}="Not Supported", {f_proactive}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_intent}="Limited Support", {f_entity}="Limited Support", {f_gen_summary}="Limited Support", {f_gen_disp}="Limited Support", {f_redaction}="Limited Support", {f_kaas}="Limited Support", {f_proactive}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_intent)}, {is_not_supported(f_entity)}, {is_not_supported(f_gen_summary)}, {is_not_supported(f_gen_disp)}, {is_not_supported(f_redaction)}, {is_not_supported(f_kaas)}, {is_not_supported(f_proactive)}), "Not Supported", '
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_intent)}, {is_limited(f_entity)}, {is_limited(f_gen_summary)}, {is_limited(f_gen_disp)}, {is_limited(f_redaction)}, {is_limited(f_kaas)}, {is_limited(f_proactive)}), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=3, value=formula_rtga).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     # 3. CIA (ASR, Gen AI Disposition, Redaction, Conversation Facts)
     formula_cia = (
-        f'=IF(OR({f_asr}="Not Supported", {f_gen_disp}="Not Supported", {f_redaction}="Not Supported", {f_conv_facts}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_gen_disp}="Limited Support", {f_redaction}="Limited Support", {f_conv_facts}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_gen_disp)}, {is_not_supported(f_redaction)}, {is_not_supported(f_conv_facts)}), "Not Supported", '
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_gen_disp)}, {is_limited(f_redaction)}, {is_limited(f_conv_facts)}), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=4, value=formula_cia).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     # 4. CRA (ASR, Redaction)
     formula_cra = (
-        f'=IF(OR({f_asr}="Not Supported", {f_redaction}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_redaction}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({is_not_supported(f_asr)}, {is_not_supported(f_redaction)}), "Not Supported", '
+        f'IF(OR({is_limited(f_asr)}, {is_limited(f_redaction)}), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=5, value=formula_cra).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
