@@ -10,15 +10,26 @@ from openpyxl.styles.differential import DifferentialStyle
 filename = "Smart_Availability_Matrix.xlsx"
 regions = ["USA", "Europe", "UAE", "APAC", "Saudi"]
 languages = ["English", "Hindi", "Spanish", "German", "Arabic", "French", "Italian"]
-services = ["ASR", "NLP Services", "Gen AI Services", "KaaS/PKaaS"]
+services = [
+    "ASR",
+    "Redaction",
+    "Conversation Facts",
+    "Gen AI Disposition",
+    "ITN",
+    "Intent (UniFit)",
+    "Entity (NER/Spacy)",
+    "Gen AI Summary",
+    "Pro-active Service",
+    "LLM"
+]
 products = ["SSA", "RTGA", "CIA", "CRA"]
 statuses = ["Full Support", "Limited Support", "Not Supported"]
 
 # Dependency Logic (For Reference/Comments)
-# SSA: ASR, Gen AI, KaaS
-# RTGA: ASR, NLP, Gen AI, KaaS
-# CIA: NLP, Gen AI
-# CRA: ASR
+# SSA: ASR, Gen AI Summary, LLM, Conversation Facts
+# RTGA: ASR, Intent (UniFit), Entity (NER/Spacy), Gen AI Disposition, LLM, Pro-active Service
+# CIA: Intent (UniFit), Entity (NER/Spacy), Gen AI Summary, Conversation Facts, LLM
+# CRA: ASR, Redaction
 
 wb = Workbook()
 
@@ -173,38 +184,45 @@ def get_lookup_formula(service_name, row_idx):
 for i, lang in enumerate(languages):
     r = start_row + 1 + i
     ws_prod.cell(row=r, column=1, value=lang).font = Font(bold=True)
-    
-    # 1. SSA (ASR, Gen AI, KaaS)
-    # Logic: If ANY are "Not Supported" -> Not Supported. Else if ANY are "Limited" -> Limited. Else Full.
+
+    # Service lookup formulas
     f_asr = get_lookup_formula("ASR", r)
-    f_gen = get_lookup_formula("Gen AI Services", r)
-    f_kaas = get_lookup_formula("KaaS/PKaaS", r)
-    
+    f_redaction = get_lookup_formula("Redaction", r)
+    f_conv_facts = get_lookup_formula("Conversation Facts", r)
+    f_gen_disp = get_lookup_formula("Gen AI Disposition", r)
+    f_itn = get_lookup_formula("ITN", r)
+    f_intent = get_lookup_formula("Intent (UniFit)", r)
+    f_entity = get_lookup_formula("Entity (NER/Spacy)", r)
+    f_gen_summary = get_lookup_formula("Gen AI Summary", r)
+    f_proactive = get_lookup_formula("Pro-active Service", r)
+    f_llm = get_lookup_formula("LLM", r)
+
+    # 1. SSA (ASR, Gen AI Summary, LLM, Conversation Facts)
+    # Logic: If ANY are "Not Supported" -> Not Supported. Else if ANY are "Limited" -> Limited. Else Full.
     formula_ssa = (
-        f'=IF(OR({f_asr}="Not Supported", {f_gen}="Not Supported", {f_kaas}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_gen}="Limited Support", {f_kaas}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({f_asr}="Not Supported", {f_gen_summary}="Not Supported", {f_llm}="Not Supported", {f_conv_facts}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_asr}="Limited Support", {f_gen_summary}="Limited Support", {f_llm}="Limited Support", {f_conv_facts}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=2, value=formula_ssa).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # 2. RTGA (ASR, NLP, Gen AI, KaaS)
-    f_nlp = get_lookup_formula("NLP Services", r)
+    # 2. RTGA (ASR, Intent, Entity, Gen AI Disposition, LLM, Pro-active Service)
     formula_rtga = (
-        f'=IF(OR({f_asr}="Not Supported", {f_nlp}="Not Supported", {f_gen}="Not Supported", {f_kaas}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_asr}="Limited Support", {f_nlp}="Limited Support", {f_gen}="Limited Support", {f_kaas}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({f_asr}="Not Supported", {f_intent}="Not Supported", {f_entity}="Not Supported", {f_gen_disp}="Not Supported", {f_llm}="Not Supported", {f_proactive}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_asr}="Limited Support", {f_intent}="Limited Support", {f_entity}="Limited Support", {f_gen_disp}="Limited Support", {f_llm}="Limited Support", {f_proactive}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=3, value=formula_rtga).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # 3. CIA (NLP, Gen AI)
+    # 3. CIA (Intent, Entity, Gen AI Summary, Conversation Facts, LLM)
     formula_cia = (
-        f'=IF(OR({f_nlp}="Not Supported", {f_gen}="Not Supported"), "Not Supported", '
-        f'IF(OR({f_nlp}="Limited Support", {f_gen}="Limited Support"), "Limited Support", "Full Support"))'
+        f'=IF(OR({f_intent}="Not Supported", {f_entity}="Not Supported", {f_gen_summary}="Not Supported", {f_conv_facts}="Not Supported", {f_llm}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_intent}="Limited Support", {f_entity}="Limited Support", {f_gen_summary}="Limited Support", {f_conv_facts}="Limited Support", {f_llm}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=4, value=formula_cia).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # 4. CRA (ASR)
+    # 4. CRA (ASR, Redaction)
     formula_cra = (
-        f'=IF({f_asr}="Not Supported", "Not Supported", '
-        f'IF({f_asr}="Limited Support", "Limited Support", "Full Support"))'
+        f'=IF(OR({f_asr}="Not Supported", {f_redaction}="Not Supported"), "Not Supported", '
+        f'IF(OR({f_asr}="Limited Support", {f_redaction}="Limited Support"), "Limited Support", "Full Support"))'
     )
     ws_prod.cell(row=r, column=5, value=formula_cra).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
