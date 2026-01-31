@@ -263,25 +263,33 @@ for i, lang in enumerate(languages):
 
     for prod_idx, (product, deps) in enumerate(product_deps.items()):
         col = start_col + prod_idx
+        total_deps = len(deps)
+        threshold = total_deps / 2  # More than 50%
 
         # Build conditions for this product
-        # 1. Any dependency Not Supported globally (in ALL regions) → Not Supported
-        globally_not_supported = [is_not_supported_globally(dep, r) for dep in deps]
+        # 1. Count dependencies Not Supported globally (in ALL regions)
+        globally_not_supported_conditions = [f'IF({is_not_supported_globally(dep, r)},1,0)' for dep in deps]
+        count_globally_not_supported = f'({"+".join(globally_not_supported_conditions)})'
 
         # 2. Any dependency needs Cross-Region → Full Support (Cross-Region)
         needs_cross = [needs_cross_region(dep, r) for dep in deps]
 
-        # 3. Any dependency Limited locally → Limited Availability
+        # 3. Any dependency Limited locally OR any dependency not supported globally (but ≤50%) → Limited Availability
         limited_locally = [is_limited_locally(dep, r) for dep in deps]
+        globally_not_supported = [is_not_supported_globally(dep, r) for dep in deps]
 
         # 4. Otherwise → Full Support (In-Region)
 
         # Build the formula
-        # Priority: Not Supported > Cross-Region > Limited > In-Region
+        # Priority:
+        # 1. >50% dependencies Not Supported globally → Not Supported
+        # 2. Any needs Cross-Region → Full Support (Cross-Region)
+        # 3. Any Limited locally OR any Not Supported globally (≤50%) → Limited Availability
+        # 4. All General Availability locally → Full Support (In-Region)
         formula = (
-            f'=IF(OR({",".join(globally_not_supported)}), "Not Supported", '
+            f'=IF({count_globally_not_supported}>{threshold}, "Not Supported", '
             f'IF(OR({",".join(needs_cross)}), "Full Support (Cross-Region)", '
-            f'IF(OR({",".join(limited_locally)}), "Limited Availability", '
+            f'IF(OR({",".join(limited_locally)},{",".join(globally_not_supported)}), "Limited Availability", '
             f'"Full Support (In-Region)")))'
         )
 
