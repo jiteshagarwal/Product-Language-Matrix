@@ -283,12 +283,12 @@ for i, lang in enumerate(languages):
         # Priority:
         # 1. 100% GA locally → Full Support (In-Region)
         # 2. 100% GA possible (locally or cross-region) → Full Support (Cross-Region)
-        # 3. Availability >= 70% → Limited Availability
-        # 4. Availability < 70% → Not Supported
+        # 3. Availability >= 50% → Limited Availability
+        # 4. Availability < 50% → Not Supported
         formula = (
             f'=IF({count_ga_locally}={total_deps}, "Full Support (In-Region)", '
             f'IF({count_ga_possible}={total_deps}, "Full Support (Cross-Region)", '
-            f'IF({availability_pct}>=0.7, "Limited Availability", '
+            f'IF({availability_pct}>=0.5, "Limited Availability", '
             f'"Not Supported")))'
         )
 
