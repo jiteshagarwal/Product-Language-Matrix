@@ -226,27 +226,26 @@ def get_local_status(service_name, row_idx):
     """Get status of service in selected region"""
     return f'INDEX(Service_Input!$D:$D, MATCH($C$4&"|{service_name}|"&$A{row_idx}, Service_Input!$E:$E, 0))'
 
-def get_global_not_supported_count(service_name, row_idx):
-    """Count how many regions have this service as 'Not Supported' for the language"""
-    # COUNTIFS to count rows where Service matches, Language matches, and Status is "Not Supported"
-    return f'COUNTIFS(Service_Input!$B:$B,"{service_name}",Service_Input!$C:$C,$A{row_idx},Service_Input!$D:$D,"Not Supported")'
+def get_ga_count_globally(service_name, row_idx):
+    """Count how many regions have this service as 'General Availability' for the language"""
+    return f'COUNTIFS(Service_Input!$B:$B,"{service_name}",Service_Input!$C:$C,$A{row_idx},Service_Input!$D:$D,"General Availability")'
 
-def is_not_supported_locally(service_name, row_idx):
-    """Check if service is Not Supported in selected region"""
-    return f'{get_local_status(service_name, row_idx)}="Not Supported"'
+def is_ga_locally(service_name, row_idx):
+    """Check if service is General Availability in selected region"""
+    return f'{get_local_status(service_name, row_idx)}="General Availability"'
 
-def is_limited_locally(service_name, row_idx):
+def is_la_locally(service_name, row_idx):
     """Check if service is Limited Availability in selected region"""
     return f'{get_local_status(service_name, row_idx)}="Limited Availability"'
 
-def is_not_supported_globally(service_name, row_idx):
-    """Check if service is Not Supported in ALL regions (count = num_regions)"""
-    return f'{get_global_not_supported_count(service_name, row_idx)}={num_regions}'
+def is_ga_anywhere(service_name, row_idx):
+    """Check if service is GA in at least one region"""
+    return f'{get_ga_count_globally(service_name, row_idx)}>=1'
 
-def needs_cross_region(service_name, row_idx):
-    """Check if service needs cross-region (Not Supported locally but available somewhere)"""
-    # Not supported locally AND not supported globally count < num_regions (meaning available somewhere)
-    return f'AND({is_not_supported_locally(service_name, row_idx)}, {get_global_not_supported_count(service_name, row_idx)}<{num_regions})'
+def is_available(service_name, row_idx):
+    """Check if service is available (GA locally, LA locally, or GA via cross-region)"""
+    # Available = GA locally OR LA locally OR (Not supported locally but GA somewhere)
+    return f'OR({is_ga_locally(service_name, row_idx)},{is_la_locally(service_name, row_idx)},{is_ga_anywhere(service_name, row_idx)})'
 
 # Product dependencies
 product_deps = {
@@ -264,33 +263,33 @@ for i, lang in enumerate(languages):
     for prod_idx, (product, deps) in enumerate(product_deps.items()):
         col = start_col + prod_idx
         total_deps = len(deps)
-        threshold = total_deps / 2  # More than 50%
 
-        # Build conditions for this product
-        # 1. Count dependencies Not Supported globally (in ALL regions)
-        globally_not_supported_conditions = [f'IF({is_not_supported_globally(dep, r)},1,0)' for dep in deps]
-        count_globally_not_supported = f'({"+".join(globally_not_supported_conditions)})'
+        # Count GA locally (for Full Support In-Region check)
+        ga_locally_conditions = [f'IF({is_ga_locally(dep, r)},1,0)' for dep in deps]
+        count_ga_locally = f'({"+".join(ga_locally_conditions)})'
 
-        # 2. Any dependency needs Cross-Region → Full Support (Cross-Region)
-        needs_cross = [needs_cross_region(dep, r) for dep in deps]
+        # Count GA possible (locally or cross-region) for Full Support Cross-Region check
+        ga_possible_conditions = [f'IF({is_ga_anywhere(dep, r)},1,0)' for dep in deps]
+        count_ga_possible = f'({"+".join(ga_possible_conditions)})'
 
-        # 3. Any dependency Limited locally OR any dependency not supported globally (but ≤50%) → Limited Availability
-        limited_locally = [is_limited_locally(dep, r) for dep in deps]
-        globally_not_supported = [is_not_supported_globally(dep, r) for dep in deps]
+        # Count available (GA local, LA local, or GA cross-region) for availability %
+        available_conditions = [f'IF({is_available(dep, r)},1,0)' for dep in deps]
+        count_available = f'({"+".join(available_conditions)})'
 
-        # 4. Otherwise → Full Support (In-Region)
+        # Availability percentage
+        availability_pct = f'({count_available}/{total_deps})'
 
         # Build the formula
         # Priority:
-        # 1. >50% dependencies Not Supported globally → Not Supported
-        # 2. Any needs Cross-Region → Full Support (Cross-Region)
-        # 3. Any Limited locally OR any Not Supported globally (≤50%) → Limited Availability
-        # 4. All General Availability locally → Full Support (In-Region)
+        # 1. 100% GA locally → Full Support (In-Region)
+        # 2. 100% GA possible (locally or cross-region) → Full Support (Cross-Region)
+        # 3. Availability >= 70% → Limited Availability
+        # 4. Availability < 70% → Not Supported
         formula = (
-            f'=IF({count_globally_not_supported}>{threshold}, "Not Supported", '
-            f'IF(OR({",".join(needs_cross)}), "Full Support (Cross-Region)", '
-            f'IF(OR({",".join(limited_locally)},{",".join(globally_not_supported)}), "Limited Availability", '
-            f'"Full Support (In-Region)")))'
+            f'=IF({count_ga_locally}={total_deps}, "Full Support (In-Region)", '
+            f'IF({count_ga_possible}={total_deps}, "Full Support (Cross-Region)", '
+            f'IF({availability_pct}>=0.7, "Limited Availability", '
+            f'"Not Supported")))'
         )
 
         cell = ws_prod.cell(row=r, column=col, value=formula)
